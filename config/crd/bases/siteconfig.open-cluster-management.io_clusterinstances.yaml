@@ -625,6 +625,16 @@ spec:
                   - templateRefs
                   type: object
                 type: array
+              osImageStream:
+                description: |-
+                  OSImageStream is the OS stream to use when installing the cluster
+                  (e.g. "rhel-9", "rhel-10"). It is rendered as the osStream field of
+                  the AgentClusterInstall consumed by the Assisted Installer, which
+                  selects the OS image matching the cluster's OpenShift version for
+                  this stream. If omitted, the default OS stream for the OpenShift
+                  version referenced by ClusterImageSetNameRef is used.
+                pattern: ^[a-z0-9][a-z0-9._-]*$
+                type: string
               platformType:
                 description: |-
                   platformType specifies the infrastructure platform for installation.

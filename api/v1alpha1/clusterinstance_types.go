@@ -356,6 +356,16 @@ type ClusterInstanceSpec struct {
 	// +required
 	PullSecretRef corev1.LocalObjectReference `json:"pullSecretRef"`
 
+	// OSImageStream is the OS stream to use when installing the cluster
+	// (e.g. "rhel-9", "rhel-10"). It is rendered as the osStream field of
+	// the AgentClusterInstall consumed by the Assisted Installer, which
+	// selects the OS image matching the cluster's OpenShift version for
+	// this stream. If omitted, the default OS stream for the OpenShift
+	// version referenced by ClusterImageSetNameRef is used.
+	// +kubebuilder:validation:Pattern=`^[a-z0-9][a-z0-9._-]*$`
+	// +optional
+	OSImageStream string `json:"osImageStream,omitempty"`
+
 	// ClusterImageSetNameRef is the name of the ClusterImageSet resource indicating which
 	// OpenShift version to deploy.
 	// +required
@@ -731,6 +741,17 @@ type ClusterInstanceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ClusterInstance `json:"items"`
+}
+
+// GetOSImageStream returns the OS stream selected by this spec: the value of
+// OSImageStream when set, or an empty string when omitted, in which case the
+// Assisted Installer falls back to the default OS stream of the OpenShift
+// version defined by the referenced ClusterImageSet.
+func (s *ClusterInstanceSpec) GetOSImageStream() string {
+	if s.OSImageStream != "" {
+		return s.OSImageStream
+	}
+	return ""
 }
 
 func init() {

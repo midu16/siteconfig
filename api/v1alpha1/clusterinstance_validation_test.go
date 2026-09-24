@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -98,6 +100,38 @@ var _ = Describe("ValidateClusterInstance", func() {
 		err := ValidateClusterInstance(clusterInstance)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("single node OpenShift cluster-type must have exactly 1 control-plane agent"))
+	})
+
+	It("should return nil when osImageStream is not set", func() {
+		err := ValidateClusterInstance(clusterInstance)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should return nil when osImageStream is a valid stream name", func() {
+		clusterInstance.Spec.OSImageStream = "rhel-10"
+		err := ValidateClusterInstance(clusterInstance)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should return an error if osImageStream has an invalid format", func() {
+		clusterInstance.Spec.OSImageStream = "RHEL_10"
+		err := ValidateClusterInstance(clusterInstance)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("osImageStream \"RHEL_10\" is invalid: must match pattern"))
+	})
+
+	It("should return an error if osImageStream starts with an invalid character", func() {
+		clusterInstance.Spec.OSImageStream = "-rhel-10"
+		err := ValidateClusterInstance(clusterInstance)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("osImageStream \"-rhel-10\" is invalid: must match pattern"))
+	})
+
+	It("should return an error if osImageStream is too long", func() {
+		clusterInstance.Spec.OSImageStream = strings.Repeat("a", maxOSImageStreamLength+1)
+		err := ValidateClusterInstance(clusterInstance)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("is too long"))
 	})
 })
 
@@ -423,6 +457,12 @@ var _ = Describe("validatePostProvisioningChanges", func() {
 
 		It("should return nil for clusterImageSetNameRef", func() {
 			newClusterInstance.Spec.ClusterImageSetNameRef = "openshift-test-updated"
+			err := validatePostProvisioningChanges(testLogger, oldClusterInstance, newClusterInstance, false)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should return nil for osImageStream", func() {
+			newClusterInstance.Spec.OSImageStream = "rhel-10"
 			err := validatePostProvisioningChanges(testLogger, oldClusterInstance, newClusterInstance, false)
 			Expect(err).ToNot(HaveOccurred())
 		})

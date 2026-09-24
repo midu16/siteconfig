@@ -28,6 +28,7 @@ import (
 	aiv1beta1 "github.com/openshift/assisted-service/api/v1beta1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/stolostron/siteconfig/api/v1alpha1"
+	assistedinstaller "github.com/stolostron/siteconfig/internal/templates/assisted-installer"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -944,5 +945,79 @@ var _ = Describe("ProcessTemplates", func() {
 		err = expected.AddObjects(expectedSlice)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(reflect.DeepEqual(got, expected)).To(BeTrue())
+	})
+
+	Describe("AgentClusterInstall osStream rendering", func() {
+		var (
+			ctx        context.Context
+			c          client.Client
+			clusterIns *v1alpha1.ClusterInstance
+			tmplEngine *TemplateEngine
+		)
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			testScheme := scheme.Scheme
+			_ = hivev1.AddToScheme(testScheme)
+			c = fakeclient.NewClientBuilder().
+				WithScheme(testScheme).
+				WithObjects(GetMockClusterImageSet("openshift-test", "test-image")).
+				Build()
+
+			tmplEngine = NewTemplateEngine()
+			clusterIns = &v1alpha1.ClusterInstance{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "site-sno-du-1",
+					Namespace: "site-sno-du-1",
+				},
+				Spec: v1alpha1.ClusterInstanceSpec{
+					ClusterName:            "site-sno-du-1",
+					PullSecretRef:          corev1.LocalObjectReference{Name: "pullSecretName"},
+					ClusterImageSetNameRef: "openshift-test",
+					SSHPublicKey:           "ssh-rsa",
+					BaseDomain:             "example.com",
+					NetworkType:            "OVNKubernetes",
+					OSImageStream:          "rhel-10",
+					Nodes: []v1alpha1.NodeSpec{
+						{HostName: "node1", Role: "master"},
+					},
+				},
+			}
+		})
+
+		renderAgentClusterInstall := func() (map[string]interface{}, error) {
+			manifest, err := tmplEngine.render(
+				"AgentClusterInstall",
+				assistedinstaller.AgentClusterInstall,
+				func() *ClusterData {
+					data, err := buildClusterData(ctx, c, clusterIns, nil)
+					if err != nil {
+						Fail(err.Error())
+					}
+					return data
+				}(),
+			)
+			return manifest, err
+		}
+
+		It("renders the AgentClusterInstall osStream field when osImageStream is set", func() {
+			manifest, err := renderAgentClusterInstall()
+			Expect(err).ToNot(HaveOccurred())
+
+			spec, ok := manifest["spec"].(map[string]interface{})
+			Expect(ok).To(BeTrue())
+			Expect(spec["osStream"]).To(Equal("rhel-10"))
+		})
+
+		It("omits the AgentClusterInstall osStream field when osImageStream is not set", func() {
+			clusterIns.Spec.OSImageStream = ""
+			manifest, err := renderAgentClusterInstall()
+			Expect(err).ToNot(HaveOccurred())
+
+			spec, ok := manifest["spec"].(map[string]interface{})
+			Expect(ok).To(BeTrue())
+			_, present := spec["osStream"]
+			Expect(present).To(BeFalse())
+		})
 	})
 })

@@ -47,6 +47,7 @@ type TestParams struct {
 	BmcCredentialsName   string
 	ClusterImageSetName  string
 	ClusterImageSetImage string
+	OSImageStream        string
 	ExtraManifestName    string
 	ClusterTemplateRef   string
 	NodeTemplateRef      string
@@ -184,6 +185,7 @@ func GetMockSNOClusterInstance(testParams *TestParams) *v1alpha1.ClusterInstance
 			ClusterName:            testParams.ClusterName,
 			PullSecretRef:          corev1.LocalObjectReference{Name: testParams.PullSecret},
 			ClusterImageSetNameRef: testParams.ClusterImageSetName,
+			OSImageStream:          testParams.OSImageStream,
 			SSHPublicKey:           "test-ssh",
 			BaseDomain:             "abcd",
 			ClusterType:            v1alpha1.ClusterTypeSNO,

@@ -41,6 +41,9 @@ spec:
   holdInstallation: {{ .Spec.HoldInstallation }}
   imageSetRef:
     name: "{{ .Spec.ClusterImageSetNameRef }}"
+{{ if .Spec.OSImageStream }}
+  osStream: "{{ .Spec.OSImageStream }}"
+{{ end }}
 {{ if .Spec.ApiVIPs }}
   apiVIPs:
 {{ .Spec.ApiVIPs | toYaml | indent 4 }}

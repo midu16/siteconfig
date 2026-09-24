@@ -140,6 +140,7 @@ var (
 		"/suppressedManifests",
 		"/pruneManifests",
 		"/clusterImageSetNameRef",
+		"/osImageStream",    // Allow updating the OS stream (selects the OS image for the cluster's OpenShift version)
 		"/holdInstallation", // Allow toggling HoldInstallation (only true→false is valid, enforced in webhook)
 	}
 
@@ -184,6 +185,11 @@ func ValidateClusterInstance(clusterInstance *ClusterInstance) error {
 		if len(node.TemplateRefs) == 0 {
 			return fmt.Errorf("missing node-level template reference for node %q", node.HostName)
 		}
+	}
+
+	// Validate the OS image stream, when set.
+	if err := validateOSImageStream(clusterInstance); err != nil {
+		return fmt.Errorf("osImageStream validation failed: %w", err)
 	}
 
 	// Validate JSON fields in the spec.
@@ -816,6 +822,38 @@ func isValidJSON(input string) bool {
 
 	var jsonData interface{}
 	return json.Unmarshal([]byte(input), &jsonData) == nil
+}
+
+const maxOSImageStreamLength = 63
+
+// osImageStreamPattern is the set of characters allowed in an OS stream name
+// (e.g. "rhel-9", "rhel-10"). It must start with a lowercase alphanumeric
+// character and may contain lowercase letters, digits, dots, underscores, and
+// dashes.
+var osImageStreamPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
+
+// validateOSImageStream checks the osImageStream field. It must be absent or a
+// well-formed OS stream name. When it is set it takes effect: it is rendered
+// as the osStream field of the AgentClusterInstall and selects the OS image
+// for the cluster's OpenShift version in the Assisted Installer. When absent,
+// the default OS stream of the referenced OpenShift version is used.
+func validateOSImageStream(clusterInstance *ClusterInstance) error {
+	stream := clusterInstance.Spec.OSImageStream
+	if stream == "" {
+		return nil
+	}
+
+	if len(stream) > maxOSImageStreamLength {
+		return fmt.Errorf("osImageStream %q is too long (%d chars, max allowed: %d)",
+			stream, len(stream), maxOSImageStreamLength)
+	}
+
+	if !osImageStreamPattern.MatchString(stream) {
+		return fmt.Errorf("osImageStream %q is invalid: must match pattern %q",
+			stream, osImageStreamPattern.String())
+	}
+
+	return nil
 }
 
 // validateClusterInstanceJSONFields ensures that JSON-formatted fields in a ClusterInstance are valid.
